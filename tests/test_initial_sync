@@ -1,0 +1,101 @@
+#!/bin/bash
+# Test how to automatically deal with first try synching scenario
+# Expected behaviour is to merge data from A to R
+
+# SERVER IS SUPPOSED TO BE EMPTY
+#1 pc-android empty
+
+# Setup test
+a="tmp/a"
+b="tmp/b"
+remote="tmp/remote"
+cache="tmp/cache"
+echo '' > debug.log
+
+function bisync(){
+    # bisync [local] [flags]
+    rclone bisync \
+        $1 $remote \
+        --verbose \
+        --workdir $cache \
+        $2
+}
+
+function autosync(){
+    echo '' > autosync.log
+    autosync-run $@
+    # rm autosync.log
+}
+
+function autosync-run(){
+    # autosync-run [local] [remote] [flags]
+    echo 'Running autosync-run'
+    date > autosync.tmp
+
+    bisync $a &>> autosync.tmp
+
+    # Deal with no prior run case (.lst doesn't exit on cache folder)
+    if grep -q 'error: cannot find prior Path1 or Path2 listings' autosync.tmp; then
+        echo 'No prior sync. Trying --resync'
+        if bisync $a --resync &>> autosync.tmp; then
+            echo 'Autosync first run succeded'
+        else
+            echo "Autosync first run failed"
+        fi
+    else
+        echo 'Autosync succeced'
+    fi
+
+    echo '[ autosync.tmp file: ]' >> debug.log
+    cat autosync.tmp >> debug.log
+    rm autosync.tmp
+}
+
+function log_folder(){
+    # log_folder [output] [msg] [folder]
+    echo $2 >> $1
+    ls -a $3 >> $1
+}
+
+function log_tree(){
+    # log_folder [log-id] [folder] [output]
+    tree $2 > "$3.$1"
+}
+
+function test_local-remote-are-empty(){
+    echo -e "Should setup the bisync succesfully\n" > "$0.test"
+
+    # Setup
+    mkdir -p $a $b $remote $cache
+    
+    # Test
+    log_tree "files_before" tmp "$0.test"
+
+    autosync-run $a $remote | tee -a "$0.test"
+
+    log_tree "files_after" tmp "$0.test"
+
+    # Destroy test
+    rm -rf tmp
+}
+
+function test_local-only-is-empty(){
+    echo -e "Should merge local and remote files\n" > "$0.test"
+
+    # Setup
+    mkdir -p $a $b $remote $cache
+    rclone test makefile $remote/
+    
+    # Test
+    log_tree "Files before" tmp "$0.test"
+
+    autosync-run $a $remote | tee "$0.test"
+
+    echo "> Files after" >> "$0.test.tree"
+    tree tmp >> "$0.test.tree"
+
+    # Destroy test
+    rm -rf tmp
+}
+
+test_local-remote-are-empty
