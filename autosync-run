@@ -1,0 +1,63 @@
+#!/bin/bash
+# Runs rclone bisync with automatic error handling for common scenarios:
+# - First run of bisync
+# - Empty directories
+
+script_debug=1
+log_file='autosync.log'
+
+debugme() {
+    [[ $script_debug = 1 ]] && "$@" || :
+}
+
+logme(){
+	# logme [heredoc/file]
+	awk '{print "  "$0}' $1
+}
+
+bisync(){
+    # bisync [local] [remote] [flags]
+    rclone bisync \
+        $1 $2 \
+        --verbose \
+        --workdir "tmp/cache" \
+        $3
+}
+
+autosync-run(){
+    # autosync-run [local] [remote] [flags]
+    echo 'Running autosync-run'
+    tmp_file="autosync.tmp"
+
+    if bisync $1 $2 &> $tmp_file; then
+				logme <<- EOF
+					autosync.tmp - sucess case
+					$(cat autosync.tmp)
+				EOF
+
+        echo 'Autosync succeded'
+        return 0
+    fi
+		logme <<- EOF
+			autosync.tmp - before retry
+			$(cat autosync.tmp)
+		EOF
+
+    # Deal with no prior run case (.lst doesn't exit on cache folder)
+    if grep -q 'error: cannot find prior Path1 or Path2 listings' "$tmp_file"; then
+        echo 'No prior sync. Trying --resync'
+        rclone test makefile 1 $1/rclone_keep
+        if bisync $1 $2 --resync &> $tmp_file; then
+            echo 'Autosync first run succeded'
+        else
+            echo "Autosync first run failed"
+        fi
+    fi
+
+    debugme echo -e "\nautosync-file after retry:"
+    debugme cat autosync.tmp
+
+}
+
+autosync-run "$@"
+rm autosync.tmp

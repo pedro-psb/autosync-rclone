@@ -1,9 +1,0 @@
-tmp
-├── a
-├── b
-├── cache
-│   ├── home_pedropsb_dev_projects_rclone-autosync_tests_tmp_a..home_pedropsb_dev_projects_rclone-autosync_tests_tmp_remote.path1.lst
-│   └── home_pedropsb_dev_projects_rclone-autosync_tests_tmp_a..home_pedropsb_dev_projects_rclone-autosync_tests_tmp_remote.path2.lst
-└── remote
-
-4 directories, 2 files

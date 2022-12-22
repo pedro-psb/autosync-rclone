@@ -1,6 +1,6 @@
 # Rclone Autosync
 
-Project to setup an automatic sync between PC and Android.
+Program to set up an automatic sync between PC and Android.
 
 It also features utilities to sync Obisidian Vault.
 

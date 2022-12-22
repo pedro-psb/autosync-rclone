@@ -1,0 +1,31 @@
+#!/bin/bash
+# test heredoc inside tabs
+
+logme(){
+	# logme [heredoc]
+	awk '{print "  "$0}' $1
+}
+
+myfunc(){
+	# Regular heredoc
+	cat <<- EOF
+	to enable left padding
+		use whitespaces on the left
+			instead of tabs
+				tabs will be ignored
+	EOF
+	# Automatic leftpad
+	awk '{print "--"$0}' <<- EOF
+	this is some text
+	and more text
+	and more text
+	that is automatic padded
+	EOF
+	# Automatic leftpad wrapped in logme utility
+	logme <<- EOF
+	hello
+	this is a message log
+	EOF
+}
+
+myfunc

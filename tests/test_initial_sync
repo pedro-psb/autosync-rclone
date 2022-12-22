@@ -6,11 +6,26 @@
 #1 pc-android empty
 
 # Setup test
-a="tmp/a"
-b="tmp/b"
-remote="tmp/remote"
-cache="tmp/cache"
-echo '' > debug.log
+result_dir="$0.results"
+debug_file="$result_dir/debug.log"
+mkdir $result_dir
+echo '' > "$result_dir/debug.log"
+
+function setup_test(){
+    a="tmp/a"
+    b="tmp/b"
+    remote="tmp/remote"
+    cache="tmp/cache"
+    mkdir -p $a $b $remote $cache
+}
+
+function teardown_test(){
+    # teardown_test [test-name]
+    echo -e "\n--------\n"
+    log_tree "files_after" tmp $1
+    rm -rf tmp
+}
+
 
 function bisync(){
     # bisync [local] [flags]
@@ -21,23 +36,17 @@ function bisync(){
         $2
 }
 
-function autosync(){
-    echo '' > autosync.log
-    autosync-run $@
-    # rm autosync.log
-}
-
 function autosync-run(){
     # autosync-run [local] [remote] [flags]
     echo 'Running autosync-run'
-    date > autosync.tmp
+    date | tee autosync.tmp
 
-    bisync $a &>> autosync.tmp
+    bisync $a | tee -a autosync.tmp
 
     # Deal with no prior run case (.lst doesn't exit on cache folder)
     if grep -q 'error: cannot find prior Path1 or Path2 listings' autosync.tmp; then
         echo 'No prior sync. Trying --resync'
-        if bisync $a --resync &>> autosync.tmp; then
+        if bisync $a --resync | tee -a autosync.tmp; then
             echo 'Autosync first run succeded'
         else
             echo "Autosync first run failed"
@@ -46,8 +55,6 @@ function autosync-run(){
         echo 'Autosync succeced'
     fi
 
-    echo '[ autosync.tmp file: ]' >> debug.log
-    cat autosync.tmp >> debug.log
     rm autosync.tmp
 }
 
@@ -62,40 +69,72 @@ function log_tree(){
     tree $2 > "$3.$1"
 }
 
-function test_local-remote-are-empty(){
-    echo -e "Should setup the bisync succesfully\n" > "$0.test"
+##########
+#tests
+##########
 
-    # Setup
-    mkdir -p $a $b $remote $cache
+# a         empty
+# b         not tested
+# remote    empty
+# expectation: both will be empty, but synched (contains .lst)
+function test_local-remote-are-empty(){
+    test_name="${FUNCNAME[0]}.test"
+    echo -e "Should setup the bisync succesfully on second try\n" > "$test_name"
+    setup_test $test_name
     
     # Test
-    log_tree "files_before" tmp "$0.test"
-
-    autosync-run $a $remote | tee -a "$0.test"
-
-    log_tree "files_after" tmp "$0.test"
+    log_tree "files_before" tmp "$test_name"
+    echo -e "\n> running $test_name\n"
+    autosync-run $a $remote | tee -a "$test_name"
+    echo -e "\n> result:"
 
     # Destroy test
-    rm -rf tmp
+    teardown_test $test_name
 }
 
+# a         empty
+# b         not tested
+# remote    fileA
+# expectation: [a] and [remote] will have fileA
 function test_local-only-is-empty(){
-    echo -e "Should merge local and remote files\n" > "$0.test"
-
-    # Setup
-    mkdir -p $a $b $remote $cache
-    rclone test makefile $remote/
+    test_name="${FUNCNAME[0]}.test"
+    echo -e "Should setup the bisync succesfully on second try\n" > "$test_name"
+    setup_test $test_name
+    rclone test makefile 5000 tmp/remote/fileA &> /dev/null
     
     # Test
-    log_tree "Files before" tmp "$0.test"
+    log_tree "files_before" tmp "$test_name"
 
-    autosync-run $a $remote | tee "$0.test"
-
-    echo "> Files after" >> "$0.test.tree"
-    tree tmp >> "$0.test.tree"
+    echo -e "\n> running $test_name\n"
+    autosync-run $a $remote | tee -a "$test_name"
+    echo -e "\n> result:\n"
 
     # Destroy test
-    rm -rf tmp
+    teardown_test $test_name
+}
+
+# a         fileA
+# b         not tested
+# remote    fileB
+# expectation: [a] and [remote] will have fileA and fileB
+function test_local-remote-with-different-content(){
+    test_name="${FUNCNAME[0]}.test"
+    echo -e "Should setup the bisync succesfully on second try\n" > "$test_name"
+    setup_test $test_name
+    rclone test makefile 5000 tmp/a/fileA &> /dev/null
+    rclone test makefile 5000 tmp/remote/fileB &> /dev/null
+    
+    # Test
+    log_tree "files_before" tmp "$test_name"
+
+    echo -e "\n> running $test_name\n"
+    autosync-run $a $remote &> $debug_file| tee -a "$test_name"
+    echo -e "\n> result:\n"
+
+    # Destroy test
+    teardown_test $test_name
 }
 
 test_local-remote-are-empty
+# test_local-only-is-empty
+# test_local-remote-with-different-content
