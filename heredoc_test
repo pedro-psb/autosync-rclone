@@ -2,8 +2,12 @@
 # test heredoc inside tabs
 
 logme(){
-	# logme [heredoc]
-	awk '{print "  "$0}' $1
+	# logme [heredoc] ['command']
+	awk '{print "  "$0}' <<- EOF
+	[ $1 ]
+	$(shift; eval $@)
+
+	EOF
 }
 
 myfunc(){
@@ -22,10 +26,7 @@ myfunc(){
 	that is automatic padded
 	EOF
 	# Automatic leftpad wrapped in logme utility
-	logme <<- EOF
-	hello
-	this is a message log
-	EOF
+	logme 'this is a message' 'date; pwd;'
 }
 
 myfunc

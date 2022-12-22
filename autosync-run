@@ -4,6 +4,7 @@
 # - Empty directories
 
 script_debug=1
+script_verbose=1
 log_file='autosync.log'
 
 debugme() {
@@ -11,8 +12,19 @@ debugme() {
 }
 
 logme(){
-	# logme [heredoc/file]
-	awk '{print "  "$0}' $1
+	# logme [msg]
+	echo $1 | tee -a tmp/autosync.log
+}
+
+logmev(){
+  # logme [heredoc] [file-to-cat]
+	if [[ $script_verbose = 1 ]]; then
+		awk '{print "    "$0}' <<- EOF | tee -a tmp/autosync.log
+			[ $1 ]
+			$(cat $2)
+			---
+		EOF
+	fi
 }
 
 bisync(){
@@ -26,38 +38,30 @@ bisync(){
 
 autosync-run(){
     # autosync-run [local] [remote] [flags]
-    echo 'Running autosync-run'
+    logme 'Running autosync-run'
     tmp_file="autosync.tmp"
 
     if bisync $1 $2 &> $tmp_file; then
-				logme <<- EOF
-					autosync.tmp - sucess case
-					$(cat autosync.tmp)
-				EOF
-
-        echo 'Autosync succeded'
+				logmev 'autosync.tmp - sucess case' autosync.tmp
+        logme 'Autosync succeded'
         return 0
     fi
-		logme <<- EOF
-			autosync.tmp - before retry
-			$(cat autosync.tmp)
-		EOF
+		logmev 'autosync.tmp - before retry' autosync.tmp
 
     # Deal with no prior run case (.lst doesn't exit on cache folder)
     if grep -q 'error: cannot find prior Path1 or Path2 listings' "$tmp_file"; then
-        echo 'No prior sync. Trying --resync'
-        rclone test makefile 1 $1/rclone_keep
+        logme 'No prior sync. Retrying with --resync'
+        rclone test makefile 1 $1/rclone_keep &> /dev/null
         if bisync $1 $2 --resync &> $tmp_file; then
-            echo 'Autosync first run succeded'
+            logme 'Autosync first run succeded'
         else
-            echo "Autosync first run failed"
+            logme "Autosync first run failed"
         fi
     fi
 
-    debugme echo -e "\nautosync-file after retry:"
-    debugme cat autosync.tmp
-
+		logmev 'autosync.tmp - after retry' autosync.tmp
 }
 
 autosync-run "$@"
+logme ''
 rm autosync.tmp
