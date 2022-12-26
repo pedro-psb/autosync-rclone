@@ -6,7 +6,7 @@ It also features utilities to sync Obisidian Vault.
 
 ## Features
 
-TODO
+- 
 
 ## Install and Setup on PC
 
