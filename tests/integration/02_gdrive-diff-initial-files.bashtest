@@ -1,0 +1,27 @@
+Local: fileA
+Remote: fileB
+Needs setting up rlcone conf with gdrive auth
+
+    $ source utils && setup
+    $ rclone listremotes --config rclone.conf
+    gdrive_test:
+    $ rclone delete gdrive_test: --config rclone.conf
+    $ rclone size gdrive_test: --config rclone.conf
+    Total objects: 0 (0)
+    Total size: 0 B (0 Byte)
+    $ rclone test makefile 100 tmp/a/fileA tmp/fileB &> /dev/null
+    $ rclone copy tmp/fileB gdrive_test: --config rclone.conf
+
+    $ source utils && autosync-run tmp/a gdrive_test:
+    Running autosync-run
+    No prior sync. Retrying with --resync
+    Autosync first run succeded
+
+    $ ls tmp/a
+    fileA fileB rclone_keep
+
+    $ rclone lsf gdrive_test: --config rclone.conf
+    fileA fileB rclone_keep
+
+    $ rclone delete gdrive_test: --config rclone.conf
+    $ source utils && teardown

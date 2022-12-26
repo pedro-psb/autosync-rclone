@@ -2,5 +2,8 @@
 
 cd tests
 [[ -f autosync.log ]] && rm autosync.log
-
-bashtest
+if [[ $# -eq 0 ]]; then
+    bashtest
+else
+    bashtest "${1}"
+fi

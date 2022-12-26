@@ -37,8 +37,10 @@ deletions on Remote:    0
 
     $ source utils && teardown
 
-deletions on A:         1
-deletions on Remote:    1
+deletions on A:         9
+deletions on Remote:    0
+Result: Abort and create error file with log info
+
     $ echo -e '\nDeletion test\n' >> autosync.log
     $ source utils && setup-deletions
 

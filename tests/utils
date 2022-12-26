@@ -13,6 +13,11 @@ setup-deletions(){
     autosync-run tmp/a tmp/remote &> /dev/null
 }
 
+setup-gdrive(){
+   [[ -d tmp ]] && rm -rf tmp
+   mkdir -p tmp/a tmp/cache
+}
+
 teardown(){
     rm -rf tmp
 }

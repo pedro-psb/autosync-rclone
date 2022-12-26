@@ -8,8 +8,13 @@ script_test=1
 script_verbose=0
 log_file='autosync.log'
 
-flags=()
-[[ $script_test = 1 ]] && flags+=(--workdir=tmp/cache)
+rclone_flags=()
+bisync_flags=() # means bisync flags
+
+if [[ $script_test = 1 ]]; then
+  bisync_flags+=(--workdir=tmp/cache)
+  rclone_flags+=(--config rclone.conf)
+fi
 
 debugme() {
     [[ $script_debug = 1 ]] && "$@" || :
@@ -41,10 +46,11 @@ logmev(){
 
 bisync(){
     # bisync [local] [remote] [flags]
-    rclone bisync \
+    rclone "${rclone_flags[@]}" \
+        bisync \
         $1 $2 \
         --verbose \
-        "${flags[@]}" \
+        "${bisync_flags[@]}" \
         $3
 }
 
@@ -77,16 +83,17 @@ autosync-run(){
         logme 'Safety abort: too many deletes. Creating error file'
 
         # create readable error message on /errors
-        rclone copy $tmp_file "$2/autosync.error.$(date)" &>> autosync.tmp
+        rclone "${rclone_flags[@]}" copyto $tmp_file "$2/autosync.error.$(date)" &>> autosync.tmp
         logmev 'autosync.tmp - after safety abort' autosync.tmp
     fi
 }
 
 main(){
   [[ ${#} -eq 0 ]] && help
-  while getopts ":v" opt; do
+  while getopts ":vt" opt; do
     case $opt in
       v)  script_verbose=1;;
+      t)  script_test=1;;
       /?) echo "Invalid option: -$OPTARG"; exit 1;;
     esac
   done

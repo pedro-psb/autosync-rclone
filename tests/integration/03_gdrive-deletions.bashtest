@@ -1,0 +1,32 @@
+setup: create files file{01..10}
+deletions on A: 9
+deletions on remote: 0
+Needs setting up rlcone conf with gdrive auth
+
+    $ source utils && setup
+    $ rclone listremotes --config rclone.conf
+    gdrive_test:
+    $ rclone delete gdrive_test: --config rclone.conf
+    $ rclone size gdrive_test: --config rclone.conf
+    Total objects: 0 (0)
+    Total size: 0 B (0 Byte)
+    $ rclone test makefile 100 tmp/a/file{01..10} &> /dev/null
+
+    $ source utils && autosync-run tmp/a gdrive_test:
+    Running autosync-run
+    No prior sync. Retrying with --resync
+    Autosync first run succeded
+
+    $ rm tmp/a/file{01..09}
+    $ source utils && autosync-run tmp/a gdrive_test:
+    Running autosync-run
+    Safety abort: too many deletes. Creating error file
+
+    $ rclone lsf gdrive_test: --config rclone.conf | wc -l
+    12
+
+    $ rclone lsf gdrive_test: --config rclone.conf | grep -q autosync.error && echo 'found errorfile'
+    found errorfile
+
+    $ rclone delete gdrive_test: --config rclone.conf --rmdirs
+    $ source utils && teardown
