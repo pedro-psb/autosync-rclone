@@ -1,0 +1,6 @@
+#!/bin/bash
+
+cd tests
+[[ -f autosync.log ]] && rm autosync.log
+
+bashtest

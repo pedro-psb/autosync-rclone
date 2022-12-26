@@ -1,0 +1,59 @@
+setup-deletions: create files file{1..10}
+deletions on A:         1
+deletions on Remote:    0
+
+    $ source utils && setup-deletions
+
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    Autosync succeded
+
+    $ rm tmp/a/file01
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    Autosync succeded
+
+    $ ls tmp/remote | wc -l
+    10
+
+    $ source utils && teardown
+
+deletions on A:         5
+deletions on Remote:    0
+
+    $ source utils && setup-deletions
+
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    Autosync succeded
+
+    $ rm tmp/a/file{01..05}
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    Autosync succeded
+
+    $ ls tmp/remote | wc -l
+    6
+
+    $ source utils && teardown
+
+deletions on A:         1
+deletions on Remote:    1
+    $ echo -e '\nDeletion test\n' >> autosync.log
+    $ source utils && setup-deletions
+
+    $ rm tmp/a/file{01..09}
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    Safety abort: too many deletes. Creating error file
+
+    $ ls tmp/remote | wc -l
+    12
+
+    $ ls tmp/remote | grep -q autosync.error && echo 'found errorfile'
+    found errorfile
+
+    $ source utils && teardown
+
+deletions on A:         1
+deletions on Remote:    1

@@ -1,0 +1,22 @@
+#!/bin/bash
+# Utilities for testin
+
+setup(){
+    [[ -d tmp ]] && rm -rf tmp
+    mkdir -p tmp/a tmp/remote tmp/cache
+}
+
+setup-deletions(){
+    [[ -d tmp ]] && rm -rf tmp
+    mkdir -p tmp/a tmp/remote tmp/cache
+    rclone test makefile 1000 tmp/a/file{01..10} &> /dev/null
+    autosync-run tmp/a tmp/remote &> /dev/null
+}
+
+teardown(){
+    rm -rf tmp
+}
+
+autosync-run(){
+    ../autosync-run "$@"
+}

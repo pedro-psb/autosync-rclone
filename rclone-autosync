@@ -1,7 +1,0 @@
-#!/bin/bash
-
-rclone bisync \
-    local remote \
-    --workdir cache \
-    --verbose
-

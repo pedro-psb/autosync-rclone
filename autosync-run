@@ -4,8 +4,12 @@
 # - Empty directories
 
 script_debug=1
-script_verbose=1
+script_test=1
+script_verbose=0
 log_file='autosync.log'
+
+flags=()
+[[ $script_test = 1 ]] && flags+=(--workdir=tmp/cache)
 
 debugme() {
     [[ $script_debug = 1 ]] && "$@" || :
@@ -13,18 +17,26 @@ debugme() {
 
 logme(){
 	# logme [msg]
-	echo $1 | tee -a tmp/autosync.log
+	echo $1 | tee -a $log_file
 }
 
 logmev(){
   # logme [heredoc] [file-to-cat]
 	if [[ $script_verbose = 1 ]]; then
-		awk '{print "    "$0}' <<- EOF | tee -a tmp/autosync.log
+		awk '{print "    "$0}' <<- EOF | tee -a $log_file
+			$(date)
 			[ $1 ]
 			$(cat $2)
 			---
 		EOF
-	fi
+	else
+		awk '{print "    "$0}' <<- EOF >> $log_file
+			$(date)
+			[ $1 ]
+			$(cat $2)
+			---
+		EOF
+  fi
 }
 
 bisync(){
@@ -32,7 +44,7 @@ bisync(){
     rclone bisync \
         $1 $2 \
         --verbose \
-        --workdir "tmp/cache" \
+        "${flags[@]}" \
         $3
 }
 
@@ -57,11 +69,31 @@ autosync-run(){
         else
             logme "Autosync first run failed"
         fi
+        logmev 'autosync.tmp - after retry' autosync.tmp
     fi
 
-		logmev 'autosync.tmp - after retry' autosync.tmp
+    # Deal with too many deletes
+    if grep -q 'Safety abort: too many deletes' "$tmp_file"; then
+        logme 'Safety abort: too many deletes. Creating error file'
+
+        # create readable error message on /errors
+        rclone copy $tmp_file "$2/autosync.error.$(date)" &>> autosync.tmp
+        logmev 'autosync.tmp - after safety abort' autosync.tmp
+    fi
 }
 
-autosync-run "$@"
-logme ''
-rm autosync.tmp
+main(){
+  [[ ${#} -eq 0 ]] && help
+  while getopts ":v" opt; do
+    case $opt in
+      v)  script_verbose=1;;
+      /?) echo "Invalid option: -$OPTARG"; exit 1;;
+    esac
+  done
+
+  autosync-run "$@"
+  logme ''
+  rm autosync.tmp
+}
+
+main "$@"

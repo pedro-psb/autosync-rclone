@@ -1,0 +1,54 @@
+Local: empty
+Remote: empty
+
+    $ source utils && setup
+
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    No prior sync. Retrying with --resync
+    Autosync first run succeded
+
+    $ ls tmp/a
+    rclone_keep
+
+    $ ls tmp/remote
+    rclone_keep
+
+    $ source utils && teardown
+
+Local: fileA
+Remote: empty
+
+    $ source utils && setup
+    $ rclone test makefile 1000 tmp/a/fileA &> /dev/null
+
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    No prior sync. Retrying with --resync
+    Autosync first run succeded
+
+    $ ls tmp/a
+    fileA rclone_keep
+
+    $ ls tmp/remote
+    fileA rclone_keep
+
+    $ source utils && teardown
+
+Local: fileA
+Remote: fileB
+
+    $ source utils
+    $ rclone test makefile 1000 tmp/a/fileA tmp/remote/fileB &> /dev/null
+
+    $ source utils && autosync-run tmp/a tmp/remote
+    Running autosync-run
+    No prior sync. Retrying with --resync
+    Autosync first run succeded
+
+    $ ls tmp/a
+    fileA fileB rclone_keep
+
+    $ ls tmp/remote
+    fileA fileB rclone_keep
+    $ source utils && teardown
