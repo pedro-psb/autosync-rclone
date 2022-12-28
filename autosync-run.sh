@@ -3,6 +3,11 @@
 # - First run of bisync
 # - Empty directories
 
+script_debug=1
+script_test='test'
+script_verbose=''
+log_file='autosync.log'
+
 help(){
 	cat <<- EOF
 	Usage:  autosync [OPTIONS]
@@ -35,22 +40,53 @@ logme(){
 	echo $1 | tee -a $log_file
 }
 
+# verbose mode logging
+# usage: logmev <message> [OPTIONS]
+# 	-d, --date	Prints date at the beginning
+#	-f, --file	Inform file to cat and add after message
 logmev(){
-	# logme [heredoc] [file-to-cat]
-	if [[ $script_verbose = 1 ]]; then
-		awk '{print "    "$0}' <<- EOF | tee -a $log_file
-			$(date)
-			[ $1 ]
-			$( [[ $# -eq 2 ]] && cat "$2")
-			---
+	[[ $# = 0 ]] && return 1;
+
+	# Parse Options
+	local message=''
+	local file_text=''
+	local args=()
+
+	while true; do
+		case $1 in
+			-d | --date)
+				# Add date
+				message+="    [ $(date) ]\n";
+				shift;;
+			-f | --file)
+				#
+				file_text=$(cat "$2");
+				shift 2;;
+			-*) shift;;
+			*)
+				args+=("$1");
+				shift;;
+		esac
+		[[ -z $1 ]] && break;
+	done
+
+	# Add message with left pad
+	message+="    [ ${args[0]} ]"
+
+	# Add optional file_text with left pad
+	if [[ -n $file_text ]]; then
+		message+="\n"
+		message+=$(awk '{print "    "$0}' <<- EOF
+			$file_text
 		EOF
+		)
+	fi
+
+	# Print message
+	if [[ $script_verbose = 'verbose' ]]; then
+		echo -e "$message" | tee -a $log_file
 	else
-		awk '{print "    "$0}' <<- EOF >> $log_file
-			$(date)
-			[ $1 ]
-			$( [[ $# -eq 2 ]] && cat "$2")
-			---
-		EOF
+		echo -e "$message" &>> $log_file
 	fi
 }
 
@@ -70,11 +106,11 @@ autosync-run(){
 		tmp_file="autosync.tmp"
 
 		if bisync $1 $2 &> $tmp_file; then
-				logmev 'autosync.tmp - sucess case' autosync.tmp
+				logmev 'autosync.tmp - sucess case' -f autosync.tmp -d
 				logme 'Autosync succeded'
 				return 0
 		fi
-		logmev 'autosync.tmp - before retry' autosync.tmp
+		logmev 'autosync.tmp - before retry' -f autosync.tmp
 
 		# Deal with no prior run case (.lst doesn't exit on cache folder)
 		if grep -q 'error: cannot find prior Path1 or Path2 listings' "$tmp_file"; then
@@ -85,7 +121,7 @@ autosync-run(){
 				else
 						logme "Autosync first run failed"
 				fi
-				logmev 'autosync.tmp - after retry' autosync.tmp
+				logmev 'autosync.tmp - after retry' -f autosync.tmp
 		fi
 
 		# Deal with too many deletes
@@ -94,16 +130,11 @@ autosync-run(){
 
 				# create readable error message on /errors
 				rclone "${rclone_flags[@]}" copyto $tmp_file "$2/autosync.error.$(date)" &>> autosync.tmp
-				logmev 'autosync.tmp - after safety abort' autosync.tmp
+				logmev 'autosync.tmp - after safety abort' -f autosync.tmp
 		fi
 }
 
 main(){
-	script_debug=1
-	script_test='test'
-	script_verbose=1
-	log_file='autosync.log'
-
 	rclone_flags=()
 	bisync_flags=()
 
@@ -113,13 +144,16 @@ main(){
 	# Handle Options
 	while true; do
 		case "$1" in
+			-it| --interface-test)
+				script_test='interface_test';;
 			-h | --help)
 				help;;
-			-q | --quiet)
-				echo "Quiet mode";
+			-v | --verbose)
+				script_verbose='verbose'
+				logmev 'Verbose mode'
 				shift;;
 			-t | --test)
-				echo "Test mode";
+				logmev 'Test mode'
 				shift;;
 			-*)
 				echo "Unknow option $1"; help; exit 1;;
@@ -158,19 +192,25 @@ main(){
 
 	# Check if local_path and remote_path are valid
 	[[ $local_path = '' || $remote_path = '' ]] && echo 'Local or Remote path not defined' && exit 1
-	logme "Local Path is: '$local_path'; Remote Path is: '$remote_path'"
+	logmev "Local Path is: '$local_path'; Remote Path is: '$remote_path'"
+	if ! rclone bisync "$local_path" "$remote_path" --resync --force --dry-run &>> autosync.log; then
+		echo "Local Path doesn't exist or Remote Path is not configured"
+		exit 1
+	fi
 
-	exit
 	# General setup
-	if [[ $script_test = 'test' ]]; then
+	if [[ $script_test != '' ]]; then
 		bisync_flags+=(--workdir=tmp/cache)
 		rclone_flags+=(--config rclone.conf)
 	fi
+
+	[[ $script_test = 'interface_test' ]] && exit 0
 	
 	# Execute program
-	autosync-run "$@"
+	autosync-run $local_path $remote_path
 	logme ''
 	rm autosync.tmp
 }
 
-main "$@"
+SCRIPT_NAME="./autosync-run.sh"
+[[ $0 = $SCRIPT_NAME ]] && main "$@"

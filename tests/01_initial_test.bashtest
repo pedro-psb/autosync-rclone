@@ -3,7 +3,7 @@ Remote: empty
 
     $ source utils && setup
 
-    $ source utils && autosync-run tmp/a tmp/remote
+    $ source utils && autosync-run tmp/a tmp/remote 
     Running autosync-run
     No prior sync. Retrying with --resync
     Autosync first run succeded

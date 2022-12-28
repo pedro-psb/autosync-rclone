@@ -1,0 +1,20 @@
+logmev msg
+    $ source ../autosync-run.sh; script_verbose='verbose'; logmev foo
+        [ foo ]
+
+logmev msg -d
+    $ source ../autosync-run.sh; script_verbose='verbose'; logmev foo -d | wc -l
+    2
+
+logmev msg -f filename
+    $ echo "some text" > testfile
+    $ source ../autosync-run.sh; script_verbose='verbose'; logmev foo -f testfile
+        [ foo ]
+        some text
+    $ rm testfile
+
+logmev msg -f filename -d
+    $ echo "some text" > testfile
+    $ source ../autosync-run.sh; script_verbose='verbose'; logmev foo -f testfile -d | wc -l
+        3
+    $ rm testfile

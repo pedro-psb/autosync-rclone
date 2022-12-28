@@ -23,5 +23,6 @@ teardown(){
 }
 
 autosync-run(){
-    ../autosync-run.sh "$@"
+    source "../autosync-run.sh"
+    main "$@"
 }
