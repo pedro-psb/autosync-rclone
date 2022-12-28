@@ -5,7 +5,10 @@
 
 help(){
 	cat <<- EOF
-	Usage: autosync [CONFIG-FILE] [OPTIONS]
+	Usage:  autosync [OPTIONS]
+	        autosync <config-file> [OPTIONS]
+	        autosync <local> <remote> [OPTIONS]
+
 	Autosync is a utility to automate the 'rclone bisync' command.
 
 	By default, it works with a config file that will be looked up on:
@@ -13,27 +16,15 @@ help(){
 	- Default on linux-pc: '~/.config/autosync/autosync.conf'
 	- Default on android-termux: 'TODO'
 
+	It will create a log file in the current folder.
+
 	Options:
 	  -h, --help		Show this help
 	  -q, --quiet		Quiet mode
 	  -t, --test		Test mode
-	  ---			I need to design the TUI better
 		
 	EOF
-	exit 0
 }
-script_debug=1
-script_test=1
-script_verbose=0
-log_file='autosync.log'
-
-rclone_flags=()
-bisync_flags=() # means bisync flags
-
-if [[ $script_test = 1 ]]; then
-	bisync_flags+=(--workdir=tmp/cache)
-	rclone_flags+=(--config rclone.conf)
-fi
 
 debugme() {
 		[[ $script_debug = 1 ]] && "$@" || :
@@ -50,14 +41,14 @@ logmev(){
 		awk '{print "    "$0}' <<- EOF | tee -a $log_file
 			$(date)
 			[ $1 ]
-			$(cat $2)
+			$( [[ $# -eq 2 ]] && cat "$2")
 			---
 		EOF
 	else
 		awk '{print "    "$0}' <<- EOF >> $log_file
 			$(date)
 			[ $1 ]
-			$(cat $2)
+			$( [[ $# -eq 2 ]] && cat "$2")
 			---
 		EOF
 	fi
@@ -108,15 +99,75 @@ autosync-run(){
 }
 
 main(){
-	[[ ${#} -eq 0 ]] && help
-	while getopts ":vt" opt; do
-		case $opt in
-			v)  script_verbose=1;;
-			t)  script_test=1;;
-			/?) echo "Invalid option: -$OPTARG"; exit 1;;
+	script_debug=1
+	script_test='test'
+	script_verbose=1
+	log_file='autosync.log'
+
+	rclone_flags=()
+	bisync_flags=()
+
+	local_path=''
+	remote_path=''
+
+	# Handle Options
+	while true; do
+		case "$1" in
+			-h | --help)
+				help;;
+			-q | --quiet)
+				echo "Quiet mode";
+				shift;;
+			-t | --test)
+				echo "Test mode";
+				shift;;
+			-*)
+				echo "Unknow option $1"; help; exit 1;;
+			*)
+				break;;	
 		esac
 	done
 
+	# Handle Positional Arguments
+	case "$#" in
+		0) # Auto seek config
+			config_paths=(
+				"$PWD/autosync.conf" \
+				"$HOME/autosync/autosync.conf" \
+				)
+			config_file=''
+			for p in "${config_paths[@]}"; do 
+				if [[ -f $p ]]; then
+					config_file="$p"
+					source "$p"
+					logme "Using config '$p'"
+					break
+				fi
+			done
+			[[ $config_file = '' ]] && echo 'Unable to find .conf file' && help
+			;;
+		1) # Config path provided
+			[[ -f $1 ]] && source "$1"
+			logme "Using config '$1'"
+			;;
+		2) # remote and local provided
+			local_path=$1
+			remote_path=$2
+			;;
+	esac
+
+	# Check if local_path and remote_path are valid
+	[[ $local_path = '' || $remote_path = '' ]] && echo 'Local or Remote path not defined' && exit 1
+	logme "Local Path is: '$local_path'; Remote Path is: '$remote_path'"
+
+	exit
+	# General setup
+	if [[ $script_test = 'test' ]]; then
+		bisync_flags+=(--workdir=tmp/cache)
+		rclone_flags+=(--config rclone.conf)
+	fi
+	
+	# Execute program
 	autosync-run "$@"
 	logme ''
 	rm autosync.tmp
