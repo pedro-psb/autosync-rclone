@@ -2,17 +2,19 @@
 # Runs rclone bisync with automatic error handling for common scenarios:
 # - First run of bisync
 # - Empty directories
+# set -eox pipefail
 
 script_debug=1
-script_test='test'
 script_verbose=''
 log_file='autosync.log'
+
+[[ -n $AUTOSYNC_DEBUG ]] && set -x;
 
 help(){
 	cat <<- EOF
 	Usage:  autosync [OPTIONS]
-	        autosync <config-file> [OPTIONS]
-	        autosync <local> <remote> [OPTIONS]
+			autosync <config-file> [OPTIONS]
+			autosync <local> <remote> [OPTIONS]
 
 	Autosync is a utility to automate the 'rclone bisync' command.
 
@@ -31,13 +33,9 @@ help(){
 	EOF
 }
 
-debugme() {
-		[[ $script_debug = 1 ]] && "$@" || :
-}
-
 logme(){
 	# logme [msg]
-	echo $1 | tee -a $log_file
+	echo "$1" | tee -a $log_file
 }
 
 # verbose mode logging
@@ -134,6 +132,67 @@ autosync-run(){
 		fi
 }
 
+
+# Provide this style of parsing:
+#   command [OPTIONS] [non-flag-args]
+#
+# any flags after the first non-flag is ignored
+argparse(){
+  : :: Getting valid options ::
+  while true; do
+	case $1 in
+		-h | --help)
+			help; exit 0;;
+		-v | --verbose)
+			script_verbose='verbose'
+			shift;;
+		-*)
+			echo "Unknow option $1"; help; exit 1;;
+		*) break;;
+	esac
+  done
+
+	: :: Discarding OPTIONS after argv ::
+  argv=()
+  while [[ -n "$1" ]]; do
+	case $1 in
+	  -*) shift;;
+	  *) argv+=("$1"); shift;;
+	esac
+  done
+  argc="${#argv[@]}"
+
+  : :: Interpreting cleaned argv :: 
+  case $argc in
+	0) # Auto seek config
+		config_paths=(
+			"$PWD/autosync.conf" \
+			"$HOME/.config/autosync/autosync.conf" \
+			"$HOME/.autosync/autosync.conf" \
+			)
+		config_file=''
+		for p in "${config_paths[@]}"; do 
+			if [[ -f $p ]]; then
+				config_file="$p"
+				source "$config_file"
+				logme "Using config '$p'"
+				break
+			fi
+		done
+		[[ $config_file = '' ]] && echo 'Unable to find .conf file' && help && exit 1;
+		;;
+	1) # Config path provided
+		[[ -f ${argv[0]} ]] && source "${argv[0]}"
+		logme "Using config '${args[0]}'"
+		;;
+	2) # remote and local provided
+		local_path="${argv[0]}"
+		remote_path="${argv[1]}"
+		;;
+  esac
+}
+
+
 main(){
 	rclone_flags=()
 	bisync_flags=()
@@ -141,76 +200,36 @@ main(){
 	local_path=''
 	remote_path=''
 
-	# Handle Options
-	while true; do
-		case "$1" in
-			-it| --interface-test)
-				script_test='interface_test';;
-			-h | --help)
-				help;;
-			-v | --verbose)
-				script_verbose='verbose'
-				logmev 'Verbose mode'
-				shift;;
-			-t | --test)
-				logmev 'Test mode'
-				shift;;
-			-*)
-				echo "Unknow option $1"; help; exit 1;;
-			*)
-				break;;	
-		esac
-	done
-
-	# Handle Positional Arguments
-	case "$#" in
-		0) # Auto seek config
-			config_paths=(
-				"$PWD/autosync.conf" \
-				"$HOME/autosync/autosync.conf" \
-				)
-			config_file=''
-			for p in "${config_paths[@]}"; do 
-				if [[ -f $p ]]; then
-					config_file="$p"
-					source "$p"
-					logme "Using config '$p'"
-					break
-				fi
-			done
-			[[ $config_file = '' ]] && echo 'Unable to find .conf file' && help
-			;;
-		1) # Config path provided
-			[[ -f $1 ]] && source "$1"
-			logme "Using config '$1'"
-			;;
-		2) # remote and local provided
-			local_path=$1
-			remote_path=$2
-			;;
-	esac
+	argparse "$@"
 
 	# Check if local_path and remote_path are valid
 	[[ $local_path = '' || $remote_path = '' ]] && echo 'Local or Remote path not defined' && exit 1
 	logmev "Local Path is: '$local_path'; Remote Path is: '$remote_path'"
-	if ! rclone bisync "$local_path" "$remote_path" --resync --force --dry-run &>> autosync.log; then
+	if ! rclone bisync "$local_path" "$remote_path" --resync --force --dry-run &>>$log_file; then
 		echo "Local Path doesn't exist or Remote Path is not configured"
 		exit 1
 	fi
 
-	# General setup
-	if [[ $script_test != '' ]]; then
+	# Test setup
+	if [[ $AUTOSYNC_TEST != '' ]]; then
 		bisync_flags+=(--workdir=tmp/cache)
 		rclone_flags+=(--config rclone.conf)
 	fi
 
-	[[ $script_test = 'interface_test' ]] && exit 0
+	if [[ $AUTOSYNC_TEST = 'interface_test' ]]; then
+		echo "LocaPath=$local_path; RemotePath=$remote_path"
+		[[ $script_verbose = 'verbose' ]] && echo "Verbose Mode"
+		exit 0
+	fi
 	
 	# Execute program
-	autosync-run $local_path $remote_path
+	autosync-run "$local_path" "$remote_path"
 	logme ''
 	rm autosync.tmp
 }
 
-SCRIPT_NAME="./autosync-run.sh"
-[[ $0 = $SCRIPT_NAME ]] && main "$@"
+# Allow sourcing this file without executing main (for testing out functions)
+__name__="$(basename $0)" 
+if [[ "$__name__" = "autosync-run" || "$__name__" = "autosync-run.sh" ]]; then
+	main "$@"
+fi

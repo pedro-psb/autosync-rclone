@@ -4,9 +4,8 @@ if [[ -e ~/bin/autosync-run ]]; then
     echo 'Autosync is already installed'
 else
     echo 'Installing autosync'
-    base_path=$(pwd)
-    program_path="$base_path/autosync-run.sh"
+    program_path="$PWD/autosync-run.sh"
 
     mkdir ~/.config/autosync
-    ln -s $program_path ~/bin/autosync
+    ln -s $program_path "$HOME/bin/autosync-run"
 fi

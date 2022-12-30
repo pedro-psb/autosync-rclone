@@ -1,5 +1,6 @@
 *.test*
 *.swp
 *.log
+*.gitmodules
 tmp/
 rclone.conf

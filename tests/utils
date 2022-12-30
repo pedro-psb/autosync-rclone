@@ -23,6 +23,13 @@ teardown(){
 }
 
 autosync-run(){
+    AUTOSYNC_TEST='test'
+    source "../autosync-run.sh"
+    main "$@"
+}
+
+autosync-run-interface(){
+    AUTOSYNC_TEST='test_interface'
     source "../autosync-run.sh"
     main "$@"
 }
